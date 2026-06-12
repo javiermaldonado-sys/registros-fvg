@@ -493,7 +493,7 @@ const SESS_KEY  = 'rf_session_v2';
 const LOCAL_KEY = 'rf_local_v2';
 
 // ── Google Sheets sync ──────────────────────────────────────────
-const GS_URL    = 'https://script.google.com/macros/s/AKfycbzifMUo3YGQRUzQ2p1rAkuAQRdlTtW5xwCdVH_ERailj6oeeSBJe0rvWabhNdRQbGXT/exec';
+const GS_URL    = 'https://script.google.com/macros/s/AKfycbx-dplAGQEyiAr1OLYcKX8QM6opsX1aUpRgWjfmtcWDaq3U0KwHqnXmeYQWRCRQioY3/exec';
 const ADMIN_KEY = 'nelav26';
 const USUARIOS  = ['Juan Yarussi','Ariel Tornimbeni'];
 let _currentUser = null;   // nombre del usuario activo
@@ -730,8 +730,7 @@ async function adminAbrirUsuario(nombre){
   // Otros usuarios: cargar desde Google Sheets
   toast('Cargando datos de ' + nombre + '...', '☁️');
   try{
-    const res = await fetch(GS_URL + '?usuario=' + encodeURIComponent(nombre));
-    const data = await res.json();
+    const data = await adminCargarUsuario(nombre);
     if(data.ok && data.payload){
       const p = data.payload;
       registros = p.registros||[]; completados = p.completados||[]; genEntregas = p.genEntregas||[];
@@ -746,23 +745,31 @@ async function adminAbrirUsuario(nombre){
   }
 }
 async function syncSheet(manual=false){
-  if(!_currentUser || _isAdmin && _currentUser === 'Javier Maldonado') return;
-  const payload = JSON.parse(buildPayload());
+  if(!_currentUser) return;
+  if(_isAdmin && _currentUser === 'Javier Maldonado' && !manual) return;
+  const payload = encodeURIComponent(buildPayload());
+  const url = GS_URL + '?action=save&usuario=' + encodeURIComponent(_currentUser) + '&payload=' + payload;
   try{
-    const res = await fetch(GS_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ usuario: _currentUser, payload })
-    });
+    const res = await fetch(url);
     const data = await res.json();
     if(data.ok){
       if(manual) toast('Sincronizado con Google Sheets ✓', '☁️');
     } else {
-      if(manual) toast('Error al sincronizar: ' + (data.error||'desconocido'), '❌');
+      if(manual) toast('Error: ' + (data.error||'desconocido'), '❌');
     }
   }catch(e){
     if(manual) toast('Sin conexión para sincronizar', '⚠️');
   }
+}
+
+async function adminCargarUsuario(nombre){
+  const url = GS_URL + '?action=load&usuario=' + encodeURIComponent(nombre);
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.ok && data.payload){
+    return { ok: true, payload: JSON.parse(data.payload) };
+  }
+  return { ok: data.ok, payload: null };
 }
 function programarSyncDiario(){
   // Calcular ms hasta las 9:00am de hoy (o mañana si ya pasó)
